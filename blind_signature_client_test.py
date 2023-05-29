@@ -16,6 +16,7 @@ from fast_pow import *
 
 import time
 import gmpy2
+import string
 
 
 def RSA_blind_signature_setup(service_name):
@@ -207,106 +208,120 @@ def RSA_sig_verify_gmpy2(m,s,public_key):
     # Compute the SHA-256 hash of the message.
     hash_obj = int.from_bytes(hashlib.sha256(m).digest(), 'big')
     # hash_obj = int(m)
-    print("m: ", hash_obj)
-    print("s:signature of m: ", s)
+    # print("m: ", hash_obj)
+    # print("s:signature of m: ", s)
     # s = int(s)
     hash_prime = pow_mod(s, rsa_key.e, rsa_key.n)
 
     return hash_obj==hash_prime # return True if the signature is valid, False otherwise
 
 
+def generate_random_string(length):
+    characters = string.ascii_letters + string.digits
+    return b''.join(random.choice(characters).encode() for _ in range(length))
+
+
+def write_to_file(filename, value):
+    with open(filename, 'a') as file:
+        file.write(str(value) + '\n')
+
 
 def main():
+    run_num = 200
+    # file name with run number
+    blind_time_file_name = f'./blind_time_{run_num}.txt'
+    unblind_time_file_name = f'./unblind_time_{run_num}.txt'
+    verify_time_file_name = f'./verify_time_{run_num}.txt'
     service_name = '1'
-    RSA_blind_signature_setup(service_name)
+    dir_path_token = f"./service_{service_name}/RSAkeys"
+    if not os.path.exists(dir_path_token):
+        RSA_blind_signature_setup(service_name)
+
+    dir_path_token = f"./service_forall/RSAkeys"
+    if not os.path.exists(dir_path_token):
+        RSA_blind_signature_setup('forall') # for base station
 
     '''test the above functions'''
     # generate a message m
     # m = b'xwang244'
-    m = b'xwang244@ncsu.edu'
+    # m = b'xwang244@ncsu.edu'
 
-    # read the RSA key pair from file (FA do this) only the FA has the private key
+
+    '''only this key need read by user '''
+    with open(f'./service_{service_name}/RSAkeys/RSA_pk.pem', 'rb') as f: # read and binary
+        service_public_key = RSA.import_key(f.read())
+        # print("public_key: ", public_key)
+    # Get n and e values
+    n_s = service_public_key.n # RSA service public key n
+    e_s = service_public_key.e # RSA service public key e
+
+    '''all the following key should read by FA, not really, user also need to read bs public key''' 
+    # the base station RSA private key and public key
+    with open('./service_forall/RSAkeys/RSA_sk.pem', 'rb') as f:
+        bs_private_key = RSA.import_key(f.read())
+    # Get the RSA private key parameter d
+    d_b = bs_private_key.d
+    n_b = bs_private_key.n
+
+    # Read public key from file
+    with open('./service_forall/RSAkeys/RSA_pk.pem', 'rb') as f:
+        bs_public_key = RSA.import_key(f.read())
+    e_b = bs_public_key.e
+
+
     with open(f'./service_{service_name}/RSAkeys/RSA_sk.pem', 'rb') as f:
-        RSA_secret_key = RSA.import_key(f.read())
-        # d = key.d
-        # n = key.n
-    
-    # read the RSA public key from file (everyone can do this, know the public key)
-    with open(f'./service_{service_name}/RSAkeys/RSA_pk.pem', 'rb') as f:
-        RSA_public_key = RSA.import_key(f.read())
-        # e = key.e
-        # n = key.n
-
-    e = RSA_public_key.e
-    n = RSA_public_key.n
-    print("e: ", e)
-    print("n: ", n)
-    d = RSA_secret_key.d
-    print("d: ", d)
-    # generate a random number r
-    r = random_r_generation(RSA_public_key.n)
-    print("r: ", r)
-
-    # generate a common string c which is the service tag in our case, we want to keep this service tag secret
-    # so this service tag should be a string that pretty hard to guess
-    # c = 'service_tag_that_hard_to_guess'
-    # c = '1'
-
-    # generate the common string \tau(c)
-    # time_0 = time.time()
-    # # tau_c = tau_c_generation(c)
-    # tau_c = tau_c_generation_gmpy2(c)
-    # time_1 = time.time()
-    # print("time for tau_c_generation: ", time_1-time_0)
-    # tau_c = 1
-    # print("tau_c: ", tau_c)
+        service_secret_key = RSA.import_key(f.read())
+    n_s = service_secret_key.n
+    d_s = service_secret_key.d
 
 
-    # blind the message m
-    time_0 = time.time()
-    # m_prime = RSA_blind(m,r,tau_c,n,e)
-    m_prime = RSA_blind_gmpy2(m,r,RSA_public_key)
-    print("m_prime: ", m_prime)
-    time_1 = time.time()
-    # print("time for RSA_blind: ", time_1-time_0)
+    for i in range(run_num):
+        m1 = generate_random_string(14)
+        m2 = generate_random_string(14)
+        min_n = min(n_s, n_b)
+        r = random.randint(1, min_n - 1)
 
 
-    # generate the lcm
-    # time_0 = time.time()
-    # lcm = lcm_generation(RSA_public_key)
-    # time_1 = time.time()
-    # print("time for lcm_generation: ", time_1-time_0)
+        # blind the two message and send to FA
+        time1 = time.time()
+        # user computes the blinded message m1' = m1 * r^e_b mod n_b
+        m1_prime = RSA_blind_gmpy2(m1,r,bs_public_key)
+        # user computes the blinded message m2' = m2 * r^e_s mod n_s
+        m2_prime = RSA_blind_gmpy2(m2,r,service_public_key)
+        time2 = time.time()
+        blind_time = time2 - time1
+        print("time for token blind: ", blind_time)
+        write_to_file(blind_time_file_name, blind_time)
+        
 
-    # blind signature generation
-    time_0 = time.time()
-    s_prime = RSA_blind_sign_gmpy2(m_prime,RSA_secret_key)
-    print("s_prime: ", s_prime)
-    time_1 = time.time()
-    # print("time for RSA_blind_sign: ", time_1-time_0)
 
-    # unblind the signature
-    time_0 = time.time()
-    s = RSA_unblind_gmpy2(s_prime,r,RSA_public_key)
-    time_1 = time.time()
-    # print("time for RSA_unblind: ", time_1-time_0)
+        # sign the blinded message by FA, we do not need to stat the time of this part at client end
+        with open(f'./service_{service_name}/RSAkeys/RSA_sk.pem', 'rb') as f:
+            service_secret_key = RSA.import_key(f.read())
+        n_s = service_secret_key.n
+        d_s = service_secret_key.d
+        # FA sign the blind message m1_prime and m2_prime
+        s1_prime = RSA_blind_sign_gmpy2(m1_prime,bs_private_key)
+        s2_prime = RSA_blind_sign_gmpy2(m2_prime,service_secret_key)
 
-    # signature verification
-    time_0 = time.time()
-    check_sig_valid = RSA_sig_verify_gmpy2(m,s,RSA_public_key)
-    print("m: ", m)
-    print("s: ", s)
-    print("type of m: ", type(m))
-    print("type of s: ", type(s))
-    if check_sig_valid:
-        print("signature verification passed")
-    else:
-        print("signature verification failed")
-    # if RSA_sig_verify(m,s,tau_c,n,e):
-    #     print("signature verification passed")
-    # else:
-    #     print("signature verification failed")
-    time_1 = time.time()
-    # print("time for RSA_sig_verify: ", time_1-time_0)
+
+        # unblind the signature from FA get the signature can actually be used
+        time3 = time.time()
+        s1 = RSA_unblind_gmpy2(s1_prime,r,bs_public_key)
+        s2 = RSA_unblind_gmpy2(s2_prime,r,service_public_key)
+        time4 = time.time()
+        unblind_time = time4 - time3
+        print("time for token unblind: ", unblind_time)
+        write_to_file(unblind_time_file_name, unblind_time)
+
+
+        time5 = time.time()
+        if RSA_sig_verify_gmpy2(m1,s1,bs_public_key) and RSA_sig_verify_gmpy2(m2,s2,service_public_key):
+            time6 = time.time()
+        verify_time = time6 - time5
+        print("time for token verification: ", verify_time)
+        write_to_file(verify_time_file_name, verify_time)
+        
 
 
 if __name__ == "__main__":
