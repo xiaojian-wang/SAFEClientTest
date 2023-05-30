@@ -84,6 +84,7 @@ import time
 import gmpy2
 # from charm.toolbox.pairinggroup import PairingGroup, ZR, G1, G2, GT, pair
 import os
+import argparse
 
 global_m = 0
 
@@ -563,8 +564,23 @@ def write_to_file(filename, value):
         file.write(str(value) + '\n')
 
 def main():
-    puzzle_number = 20
-    iteration_times = 200
+    # puzzle_number = 20
+    # iteration_times = 200
+    # Create a command-line argument parser
+    parser = argparse.ArgumentParser(description='URE Puzzle Generation')
+    parser.add_argument('--puzzle_number', type=int, help='Number of puzzles')
+    parser.add_argument('--iteration_times', type=int, help='Number of iterations')
+    args = parser.parse_args()
+
+    # Get the values of puzzle_number and iteration_times from command-line arguments
+    puzzle_number = args.puzzle_number
+    iteration_times = args.iteration_times
+
+    # Check if the required arguments are provided
+    if puzzle_number is None or iteration_times is None:
+        parser.print_help()
+        exit(1)
+
     file_name = f"URE_puzzle_{puzzle_number}_iteration_{iteration_times}.txt"
 
     # puzzle setup
