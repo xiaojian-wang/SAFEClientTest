@@ -3,6 +3,7 @@ tau_c = 1 works, but all the other tau_c not work.... 5.12.2023
 '''
 
 from Crypto.PublicKey import RSA
+
 from Crypto.Hash import SHA256
 import os
 import hashlib
@@ -227,7 +228,7 @@ def write_to_file(filename, value):
 
 
 def main():
-    run_num = 200
+    run_num = 1000
     # file name with run number
     blind_time_file_name = f'./blind_time_{run_num}.txt'
     unblind_time_file_name = f'./unblind_time_{run_num}.txt'
